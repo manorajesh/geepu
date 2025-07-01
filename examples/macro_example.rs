@@ -19,7 +19,7 @@ struct UniformData {
 async fn macro_example() -> Result<()> {
     // Create GPU context
     let context = GpuContext::new().await?;
-    
+
     println!("GPU Context created successfully!");
 
     // Create vertex data
@@ -43,7 +43,7 @@ async fn macro_example() -> Result<()> {
 
     // Create buffers
     let vertex_buffer = TypedBuffer::vertex(&context, &vertices)?;
-    
+
     let uniform_data = UniformData {
         model_matrix: [
             [1.0, 0.0, 0.0, 0.0],
@@ -71,7 +71,8 @@ async fn macro_example() -> Result<()> {
     println!("Uniform buffer size: {} bytes", uniform_buffer.size_bytes());
 
     // Demonstrate vertex layout macro
-    let vertex_layout = vertex_layout![
+    let vertex_layout =
+        vertex_layout![
         0 => VertexFormat::Float32x3, // position
         1 => VertexFormat::Float32x3, // normal
         2 => VertexFormat::Float32x2, // tex_coords
@@ -88,7 +89,7 @@ async fn macro_example() -> Result<()> {
         8,
         8,
         TextureFormat::Rgba8UnormSrgb,
-        Some("Demo Texture"),
+        Some("Demo Texture")
     )?;
 
     println!("Texture created successfully!");
@@ -101,7 +102,7 @@ async fn macro_example() -> Result<()> {
             ShaderStages::FRAGMENT,
             TextureSampleType::Float { filterable: true },
             TextureViewDimension::D2,
-            false,
+            false
         )
         .sampler(2, ShaderStages::FRAGMENT, SamplerBindingType::Filtering)
         .build(&context, Some("Demo Layout"));
@@ -133,10 +134,15 @@ async fn macro_example() -> Result<()> {
     let workgroup_size = WorkgroupSize::new(16, 16, 1);
     let data_size = (1024, 1024, 1);
     let (wx, wy, wz) = workgroup_size.workgroups_for_size(data_size.0, data_size.1, data_size.2);
-    
+
     println!("Workgroup calculation:");
     println!("  Data size: {:?}", data_size);
-    println!("  Workgroup size: ({}, {}, {})", workgroup_size.x, workgroup_size.y, workgroup_size.z);
+    println!(
+        "  Workgroup size: ({}, {}, {})",
+        workgroup_size.x,
+        workgroup_size.y,
+        workgroup_size.z
+    );
     println!("  Required workgroups: ({}, {}, {})", wx, wy, wz);
 
     println!("✅ All macro and builder examples completed successfully!");
@@ -146,7 +152,7 @@ async fn macro_example() -> Result<()> {
 
 fn main() {
     env_logger::init();
-    
+
     match pollster::block_on(macro_example()) {
         Ok(()) => println!("Macro example completed successfully!"),
         Err(e) => eprintln!("Error: {}", e),

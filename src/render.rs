@@ -1,4 +1,4 @@
-use crate::{GpuContext, RenderPipeline, TypedBuffer, Result};
+use crate::{ GpuContext, RenderPipeline, TypedBuffer, Result };
 
 /// A high-level render pass wrapper
 pub struct RenderPass<'a> {
@@ -11,15 +11,17 @@ impl<'a> RenderPass<'a> {
         encoder: &'a mut wgpu::CommandEncoder,
         color_attachments: &'a [Option<wgpu::RenderPassColorAttachment<'a>>],
         depth_stencil_attachment: Option<wgpu::RenderPassDepthStencilAttachment<'a>>,
-        label: Option<&str>,
+        label: Option<&str>
     ) -> Self {
-        let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label,
-            color_attachments,
-            depth_stencil_attachment,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-        });
+        let pass = encoder.begin_render_pass(
+            &(wgpu::RenderPassDescriptor {
+                label,
+                color_attachments,
+                depth_stencil_attachment,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            })
+        );
 
         Self { pass }
     }
@@ -35,17 +37,15 @@ impl<'a> RenderPass<'a> {
     }
 
     /// Set vertex buffer
-    pub fn set_vertex_buffer<T>(&mut self, slot: u32, buffer: &'a TypedBuffer<T>) 
-    where
-        T: bytemuck::Pod,
+    pub fn set_vertex_buffer<T>(&mut self, slot: u32, buffer: &'a TypedBuffer<T>)
+        where T: bytemuck::Pod
     {
         self.pass.set_vertex_buffer(slot, buffer.buffer().slice(..));
     }
 
     /// Set index buffer
-    pub fn set_index_buffer<T>(&mut self, buffer: &'a TypedBuffer<T>, format: wgpu::IndexFormat) 
-    where
-        T: bytemuck::Pod,
+    pub fn set_index_buffer<T>(&mut self, buffer: &'a TypedBuffer<T>, format: wgpu::IndexFormat)
+        where T: bytemuck::Pod
     {
         self.pass.set_index_buffer(buffer.buffer().slice(..), format);
     }
@@ -60,7 +60,7 @@ impl<'a> RenderPass<'a> {
         &mut self,
         indices: std::ops::Range<u32>,
         base_vertex: i32,
-        instances: std::ops::Range<u32>,
+        instances: std::ops::Range<u32>
     ) {
         self.pass.draw_indexed(indices, base_vertex, instances);
     }
@@ -74,9 +74,11 @@ pub struct RenderCommands {
 impl RenderCommands {
     /// Create new render commands
     pub fn new(context: &GpuContext, label: Option<&str>) -> Self {
-        let encoder = context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label,
-        });
+        let encoder = context.device.create_command_encoder(
+            &(wgpu::CommandEncoderDescriptor {
+                label,
+            })
+        );
 
         Self { encoder }
     }
@@ -86,7 +88,7 @@ impl RenderCommands {
         &'a mut self,
         color_attachments: &'a [Option<wgpu::RenderPassColorAttachment<'a>>],
         depth_stencil_attachment: Option<wgpu::RenderPassDepthStencilAttachment<'a>>,
-        label: Option<&str>,
+        label: Option<&str>
     ) -> RenderPass<'a> {
         RenderPass::new(&mut self.encoder, color_attachments, depth_stencil_attachment, label)
     }
@@ -98,14 +100,14 @@ impl RenderCommands {
         source_offset: u64,
         destination: &wgpu::Buffer,
         destination_offset: u64,
-        copy_size: u64,
+        copy_size: u64
     ) {
         self.encoder.copy_buffer_to_buffer(
             source,
             source_offset,
             destination,
             destination_offset,
-            copy_size,
+            copy_size
         );
     }
 
@@ -114,7 +116,7 @@ impl RenderCommands {
         &mut self,
         source: wgpu::ImageCopyBuffer,
         destination: wgpu::ImageCopyTexture,
-        copy_size: wgpu::Extent3d,
+        copy_size: wgpu::Extent3d
     ) {
         self.encoder.copy_buffer_to_texture(source, destination, copy_size);
     }
@@ -124,7 +126,7 @@ impl RenderCommands {
         &mut self,
         source: wgpu::ImageCopyTexture,
         destination: wgpu::ImageCopyBuffer,
-        copy_size: wgpu::Extent3d,
+        copy_size: wgpu::Extent3d
     ) {
         self.encoder.copy_texture_to_buffer(source, destination, copy_size);
     }
@@ -154,13 +156,19 @@ impl RenderTarget {
         height: u32,
         format: wgpu::TextureFormat,
         with_depth: bool,
-        label: Option<&str>,
+        label: Option<&str>
     ) -> Result<Self> {
         let texture = crate::Texture::create_render_target(context, width, height, format, label)?;
-        
+
         let depth_texture = if with_depth {
-            Some(crate::Texture::create_depth_texture(context, width, height, 
-                Some(&format!("{}_depth", label.unwrap_or("render_target"))))?)
+            Some(
+                crate::Texture::create_depth_texture(
+                    context,
+                    width,
+                    height,
+                    Some(&format!("{}_depth", label.unwrap_or("render_target")))
+                )?
+            )
         } else {
             None
         };
@@ -172,7 +180,10 @@ impl RenderTarget {
     }
 
     /// Get color attachment for render pass
-    pub fn color_attachment(&self, clear_color: Option<wgpu::Color>) -> wgpu::RenderPassColorAttachment {
+    pub fn color_attachment(
+        &self,
+        clear_color: Option<wgpu::Color>
+    ) -> wgpu::RenderPassColorAttachment {
         wgpu::RenderPassColorAttachment {
             view: &self.texture.view,
             resolve_target: None,
@@ -188,7 +199,10 @@ impl RenderTarget {
     }
 
     /// Get depth stencil attachment for render pass
-    pub fn depth_stencil_attachment(&self, clear_depth: Option<f32>) -> Option<wgpu::RenderPassDepthStencilAttachment> {
+    pub fn depth_stencil_attachment(
+        &self,
+        clear_depth: Option<f32>
+    ) -> Option<wgpu::RenderPassDepthStencilAttachment> {
         self.depth_texture.as_ref().map(|depth| wgpu::RenderPassDepthStencilAttachment {
             view: &depth.view,
             depth_ops: Some(wgpu::Operations {
@@ -212,7 +226,7 @@ impl RenderTarget {
 /// Helper for creating render pass color attachments
 pub fn color_attachment(
     view: &wgpu::TextureView,
-    clear_color: Option<wgpu::Color>,
+    clear_color: Option<wgpu::Color>
 ) -> wgpu::RenderPassColorAttachment {
     wgpu::RenderPassColorAttachment {
         view,
@@ -232,7 +246,7 @@ pub fn color_attachment(
 pub fn depth_stencil_attachment(
     view: &wgpu::TextureView,
     clear_depth: Option<f32>,
-    clear_stencil: Option<u32>,
+    clear_stencil: Option<u32>
 ) -> wgpu::RenderPassDepthStencilAttachment {
     wgpu::RenderPassDepthStencilAttachment {
         view,

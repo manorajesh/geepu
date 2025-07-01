@@ -36,7 +36,7 @@ struct Vertex {
 async fn render_triangle() -> Result<()> {
     // Create GPU context (without window for compute-only)
     let context = GpuContext::new().await?;
-    
+
     // Or with a window for rendering
     // let context = GpuContext::new_with_window(window).await?;
 
@@ -81,7 +81,7 @@ async fn compute_example() -> Result<()> {
     // Create input and output buffers
     let input_data = vec![1.0f32; 1024];
     let input_buffer = TypedBuffer::storage(&context, &input_data)?;
-    let output_buffer = TypedBuffer::<f32>::empty(&context, 1024, 
+    let output_buffer = TypedBuffer::<f32>::empty(&context, 1024,
         BufferUsages::STORAGE | BufferUsages::COPY_SRC)?;
 
     // Create bind group layout
@@ -223,15 +223,15 @@ let layout = vertex_layout![
 ```rust
 let layout = bind_group_layout!(&context, Some("My Layout"), {
     0 => BindingType::UniformBuffer(ShaderStages::VERTEX),
-    1 => BindingType::Texture { 
-        visibility: ShaderStages::FRAGMENT, 
-        sample_type: TextureSampleType::Float { filterable: true }, 
-        view_dimension: TextureViewDimension::D2, 
-        multisampled: false 
+    1 => BindingType::Texture {
+        visibility: ShaderStages::FRAGMENT,
+        sample_type: TextureSampleType::Float { filterable: true },
+        view_dimension: TextureViewDimension::D2,
+        multisampled: false
     },
-    2 => BindingType::Sampler { 
-        visibility: ShaderStages::FRAGMENT, 
-        sampler_type: SamplerBindingType::Filtering 
+    2 => BindingType::Sampler {
+        visibility: ShaderStages::FRAGMENT,
+        sampler_type: SamplerBindingType::Filtering
     },
 });
 ```
@@ -304,3 +304,79 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Simplified API
+
+Geepu now provides high-level helper functions that eliminate most boilerplate, letting you create render and compute pipelines with a single call.
+
+### Easy Render Pipeline
+
+Define your uniform data as a Rust struct:
+
+```rust
+#[repr(C)]
+#[derive(Copy, Clone, Pod, Zeroable)]
+struct Uniforms {
+    model: [[f32; 4]; 4],
+    view:  [[f32; 4]; 4],
+    proj:  [[f32; 4]; 4],
+}
+```
+
+Then build and use a pipeline in one step:
+
+```rust
+let uniforms = Uniforms { /* init matrices */ };
+
+let simple_pipeline = context
+    .create_simple_pipeline(
+        vertex_shader_source,
+        fragment_shader_source,
+        &[vertex_layout],         // your vertex layouts
+        &uniforms,                // your uniform struct
+        &[&texture],              // optional textures
+        Some("EasyPipeline"),    // optional label
+    )?;
+
+// Render pass usage:
+let mut commands = RenderCommands::new(&context, Some("Frame"));
+let mut pass = commands.begin_render_pass(
+    &[Some(color_attachment(&view, None))],
+    None,
+    Some("MainPass"),
+);
+pass.set_pipeline(&simple_pipeline.pipeline);
+pass.set_vertex_buffer(0, &vertex_buffer);
+pass.draw(0..3, 0..1);
+drop(pass);
+commands.submit(&context);
+```
+
+### Easy Compute Pipeline
+
+Similarly, for compute workloads:
+
+```rust
+#[repr(C)]
+#[derive(Copy, Clone, Pod, Zeroable)]
+struct Params { value: f32; }
+
+let params = Params { value: 1.0 };
+let storage_buffers = vec![&buffer_a, &buffer_b];
+
+let compute_pipeline = context
+    .create_simple_compute(
+        compute_shader_source,
+        &params,                  // uniform struct
+        &storage_buffers,         // list of storage buffers
+        Some("EasyCompute"),     // optional label
+    )?;
+
+let mut compute_cmds = ComputeCommands::new(&context, Some("Compute"));
+let mut cpass = compute_cmds.begin_compute_pass(Some("CSMain"));
+cpass.set_pipeline(&compute_pipeline.pipeline);
+cpass.set_bind_group(0, &compute_pipeline.bind_group, &[]);
+cpass.dispatch_workgroups(64, 1, 1);
+drop(cpass);
+compute_cmds.submit(&context);
+```

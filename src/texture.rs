@@ -1,4 +1,4 @@
-use crate::{GpuContext, GeepuError, Result};
+use crate::{ GpuContext, GeepuError, Result };
 use wgpu::util::DeviceExt;
 
 /// A wrapper around wgpu::Texture with convenient methods
@@ -16,11 +16,11 @@ impl Texture {
         width: u32,
         height: u32,
         format: wgpu::TextureFormat,
-        label: Option<&str>,
+        label: Option<&str>
     ) -> Result<Self> {
         let texture = context.device.create_texture_with_data(
             &context.queue,
-            &wgpu::TextureDescriptor {
+            &(wgpu::TextureDescriptor {
                 label,
                 size: wgpu::Extent3d {
                     width,
@@ -33,21 +33,23 @@ impl Texture {
                 format,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                 view_formats: &[],
-            },
+            }),
             wgpu::util::TextureDataOrder::LayerMajor,
-            bytes,
+            bytes
         );
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
+        let sampler = context.device.create_sampler(
+            &(wgpu::SamplerDescriptor {
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::FilterMode::Nearest,
+                ..Default::default()
+            })
+        );
 
         Ok(Self {
             texture,
@@ -63,33 +65,37 @@ impl Texture {
         height: u32,
         format: wgpu::TextureFormat,
         usage: wgpu::TextureUsages,
-        label: Option<&str>,
+        label: Option<&str>
     ) -> Result<Self> {
-        let texture = context.device.create_texture(&wgpu::TextureDescriptor {
-            label,
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage,
-            view_formats: &[],
-        });
+        let texture = context.device.create_texture(
+            &(wgpu::TextureDescriptor {
+                label,
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage,
+                view_formats: &[],
+            })
+        );
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
+        let sampler = context.device.create_sampler(
+            &(wgpu::SamplerDescriptor {
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::FilterMode::Nearest,
+                ..Default::default()
+            })
+        );
 
         Ok(Self {
             texture,
@@ -103,37 +109,42 @@ impl Texture {
         context: &GpuContext,
         width: u32,
         height: u32,
-        label: Option<&str>,
+        label: Option<&str>
     ) -> Result<Self> {
         let format = wgpu::TextureFormat::Depth32Float;
-        let texture = context.device.create_texture(&wgpu::TextureDescriptor {
-            label,
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
+        let texture = context.device.create_texture(
+            &(wgpu::TextureDescriptor {
+                label,
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT |
+                wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            })
+        );
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            compare: Some(wgpu::CompareFunction::LessEqual),
-            lod_min_clamp: 0.0,
-            lod_max_clamp: 100.0,
-            ..Default::default()
-        });
+        let sampler = context.device.create_sampler(
+            &(wgpu::SamplerDescriptor {
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                mipmap_filter: wgpu::FilterMode::Nearest,
+                compare: Some(wgpu::CompareFunction::LessEqual),
+                lod_min_clamp: 0.0,
+                lod_max_clamp: 100.0,
+                ..Default::default()
+            })
+        );
 
         Ok(Self {
             texture,
@@ -148,7 +159,7 @@ impl Texture {
         width: u32,
         height: u32,
         format: wgpu::TextureFormat,
-        label: Option<&str>,
+        label: Option<&str>
     ) -> Result<Self> {
         Self::create_empty(
             context,
@@ -156,7 +167,7 @@ impl Texture {
             height,
             format,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            label,
+            label
         )
     }
 
@@ -237,20 +248,22 @@ impl TextureBuilder {
     }
 
     pub fn build(self, context: &GpuContext) -> Result<Texture> {
-        let texture = context.device.create_texture(&wgpu::TextureDescriptor {
-            label: self.label.as_deref(),
-            size: wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: self.mip_level_count,
-            sample_count: self.sample_count,
-            dimension: wgpu::TextureDimension::D2,
-            format: self.format,
-            usage: self.usage,
-            view_formats: &[],
-        });
+        let texture = context.device.create_texture(
+            &(wgpu::TextureDescriptor {
+                label: self.label.as_deref(),
+                size: wgpu::Extent3d {
+                    width: self.width,
+                    height: self.height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: self.mip_level_count,
+                sample_count: self.sample_count,
+                dimension: wgpu::TextureDimension::D2,
+                format: self.format,
+                usage: self.usage,
+                view_formats: &[],
+            })
+        );
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let sampler = context.device.create_sampler(&self.sampler_descriptor);
@@ -271,17 +284,23 @@ impl Texture {
         context: &GpuContext,
         data: &[u8],
         width: u32,
-        height: u32,
+        height: u32
     ) -> Result<()> {
         let bytes_per_pixel = match self.format() {
-            wgpu::TextureFormat::Rgba8Unorm
+            | wgpu::TextureFormat::Rgba8Unorm
             | wgpu::TextureFormat::Rgba8UnormSrgb
             | wgpu::TextureFormat::Bgra8Unorm
             | wgpu::TextureFormat::Bgra8UnormSrgb => 4,
             wgpu::TextureFormat::Rgb9e5Ufloat => 4,
             wgpu::TextureFormat::Rg8Unorm => 2,
             wgpu::TextureFormat::R8Unorm => 1,
-            _ => return Err(GeepuError::TextureError("Unsupported texture format for write_data".to_string())),
+            _ => {
+                return Err(
+                    GeepuError::TextureError(
+                        "Unsupported texture format for write_data".to_string()
+                    )
+                );
+            }
         };
 
         context.queue.write_texture(
@@ -301,7 +320,7 @@ impl Texture {
                 width,
                 height,
                 depth_or_array_layers: 1,
-            },
+            }
         );
 
         Ok(())

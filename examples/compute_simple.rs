@@ -3,7 +3,7 @@ use geepu::*;
 async fn compute_example() -> Result<()> {
     // Create GPU context
     let context = GpuContext::new().await?;
-    
+
     println!("GPU Context created successfully!");
     println!("Adapter: {:?}", context.adapter.get_info());
 
@@ -15,15 +15,18 @@ async fn compute_example() -> Result<()> {
 
     // Create buffers
     let input_buffer = TypedBuffer::storage(&context, &input_data)?;
-    let output_buffer = TypedBuffer::<i32>::empty(&context, 1, 
-        BufferUsages::STORAGE | BufferUsages::COPY_SRC)?;
+    let output_buffer = TypedBuffer::<i32>::empty(
+        &context,
+        1,
+        BufferUsages::STORAGE | BufferUsages::COPY_SRC
+    )?;
 
     // Create staging buffer for reading results
     let staging_buffer = StagingBuffer::new(&context, 4)?; // 4 bytes for i32
 
     // Create bind group layout
     let bind_group_layout = BindGroupLayoutBuilder::new()
-        .storage_buffer(0, ShaderStages::COMPUTE, true)  // read-only input
+        .storage_buffer(0, ShaderStages::COMPUTE, true) // read-only input
         .storage_buffer(1, ShaderStages::COMPUTE, false) // read-write output
         .build(&context, Some("Compute Layout"));
 
@@ -34,7 +37,8 @@ async fn compute_example() -> Result<()> {
         .build(&context, Some("Compute Bind Group"));
 
     // Simple compute shader that sums all elements
-    let compute_shader = r#"
+    let compute_shader =
+        r#"
         @group(0) @binding(0) var<storage, read> input_data: array<f32>;
         @group(0) @binding(1) var<storage, read_write> output_data: array<atomic<i32>>;
 
@@ -55,19 +59,19 @@ async fn compute_example() -> Result<()> {
         &context,
         compute_shader,
         vec![bind_group_layout],
-        Some("Sum Compute Pipeline"),
+        Some("Sum Compute Pipeline")
     )?;
 
     // Execute compute shader
     let mut commands = ComputeCommands::new(&context, Some("Compute Commands"));
-    
+
     {
         let mut compute_pass = commands.begin_compute_pass(Some("Sum Pass"));
         compute_pass.set_pipeline(&pipeline);
         compute_pass.set_bind_group(0, &bind_group, &[]);
-        
+
         // Dispatch workgroups (1024 elements / 64 threads per workgroup = 16 workgroups)
-        let workgroup_count = (input_data.len() as u32 + 63) / 64;
+        let workgroup_count = ((input_data.len() as u32) + 63) / 64;
         compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
     }
 
@@ -84,7 +88,7 @@ async fn compute_example() -> Result<()> {
     println!("Computed sum: {}", computed_sum);
     println!("Expected sum: {}", expected_sum);
     println!("Difference: {}", (computed_sum - expected_sum).abs());
-    
+
     if (computed_sum - expected_sum).abs() < 0.001 {
         println!("✅ Compute shader executed successfully!");
     } else {
@@ -96,7 +100,7 @@ async fn compute_example() -> Result<()> {
 
 fn main() {
     env_logger::init();
-    
+
     match pollster::block_on(compute_example()) {
         Ok(()) => println!("Example completed successfully!"),
         Err(e) => eprintln!("Error: {}", e),

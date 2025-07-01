@@ -3,14 +3,14 @@ use geepu::*;
 async fn texture_example() -> Result<()> {
     // Create GPU context
     let context = GpuContext::new().await?;
-    
+
     println!("GPU Context created successfully!");
 
     // Create a simple 4x4 RGBA texture with a checkerboard pattern
     let width = 4u32;
     let height = 4u32;
     let mut texture_data = Vec::new();
-    
+
     for y in 0..height {
         for x in 0..width {
             // Create checkerboard pattern
@@ -32,7 +32,7 @@ async fn texture_example() -> Result<()> {
         width,
         height,
         TextureFormat::Rgba8UnormSrgb,
-        Some("Checkerboard Texture"),
+        Some("Checkerboard Texture")
     )?;
 
     println!("Texture created successfully!");
@@ -45,19 +45,14 @@ async fn texture_example() -> Result<()> {
         256,
         256,
         TextureFormat::Rgba8UnormSrgb,
-        Some("Render Target"),
+        Some("Render Target")
     )?;
 
     println!("Render target created successfully!");
     println!("Render target size: {:?}", render_target.size());
 
     // Create depth texture
-    let depth_texture = Texture::create_depth_texture(
-        &context,
-        256,
-        256,
-        Some("Depth Buffer"),
-    )?;
+    let depth_texture = Texture::create_depth_texture(&context, 256, 256, Some("Depth Buffer"))?;
 
     println!("Depth texture created successfully!");
     println!("Depth texture size: {:?}", depth_texture.size());
@@ -74,9 +69,7 @@ async fn texture_example() -> Result<()> {
     println!("Custom texture size: {:?}", custom_texture.size());
 
     // Test writing data to texture
-    let solid_red_data: Vec<u8> = (0..width * height)
-        .flat_map(|_| [255u8, 0, 0, 255])
-        .collect();
+    let solid_red_data: Vec<u8> = (0..width * height).flat_map(|_| [255u8, 0, 0, 255]).collect();
     texture.write_data(&context, &solid_red_data, width, height)?;
 
     println!("Successfully wrote solid red data to texture!");
@@ -88,7 +81,7 @@ async fn texture_example() -> Result<()> {
 
 fn main() {
     env_logger::init();
-    
+
     match pollster::block_on(texture_example()) {
         Ok(()) => println!("Texture example completed successfully!"),
         Err(e) => eprintln!("Error: {}", e),

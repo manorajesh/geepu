@@ -1,4 +1,4 @@
-use crate::{GpuContext, GeepuError, Result};
+use crate::{ GpuContext, GeepuError, Result };
 use std::marker::PhantomData;
 use wgpu::util::DeviceExt;
 
@@ -9,19 +9,16 @@ pub struct TypedBuffer<T> {
     _phantom: PhantomData<T>,
 }
 
-impl<T> TypedBuffer<T>
-where
-    T: bytemuck::Pod,
-{
+impl<T> TypedBuffer<T> where T: bytemuck::Pod {
     /// Create a new buffer with data
     pub fn new(context: &GpuContext, data: &[T], usage: wgpu::BufferUsages) -> Result<Self> {
-        let buffer = context
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let buffer = context.device.create_buffer_init(
+            &(wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("TypedBuffer<{}>", std::any::type_name::<T>())),
                 contents: bytemuck::cast_slice(data),
                 usage,
-            });
+            })
+        );
 
         Ok(Self {
             buffer,
@@ -32,12 +29,14 @@ where
 
     /// Create an empty buffer with a specific size
     pub fn empty(context: &GpuContext, len: usize, usage: wgpu::BufferUsages) -> Result<Self> {
-        let buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some(&format!("TypedBuffer<{}>", std::any::type_name::<T>())),
-            size: (len * std::mem::size_of::<T>()) as u64,
-            usage,
-            mapped_at_creation: false,
-        });
+        let buffer = context.device.create_buffer(
+            &(wgpu::BufferDescriptor {
+                label: Some(&format!("TypedBuffer<{}>", std::any::type_name::<T>())),
+                size: (len * std::mem::size_of::<T>()) as u64,
+                usage,
+                mapped_at_creation: false,
+            })
+        );
 
         Ok(Self {
             buffer,
@@ -49,14 +48,10 @@ where
     /// Write data to the buffer
     pub fn write(&self, context: &GpuContext, data: &[T]) -> Result<()> {
         if data.len() > self.len {
-            return Err(GeepuError::BufferError(
-                "Data size exceeds buffer capacity".to_string(),
-            ));
+            return Err(GeepuError::BufferError("Data size exceeds buffer capacity".to_string()));
         }
 
-        context
-            .queue
-            .write_buffer(&self.buffer, 0, bytemuck::cast_slice(data));
+        context.queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(data));
         Ok(())
     }
 
@@ -98,11 +93,7 @@ impl VertexBufferBuilder {
     }
 
     /// Add a vertex attribute
-    pub fn attribute(
-        mut self,
-        format: wgpu::VertexFormat,
-        shader_location: u32,
-    ) -> Self {
+    pub fn attribute(mut self, format: wgpu::VertexFormat, shader_location: u32) -> Self {
         let offset = self.stride;
         self.attributes.push(wgpu::VertexAttribute {
             offset,
@@ -136,10 +127,7 @@ impl Default for VertexBufferBuilder {
 }
 
 /// Convenience functions for common buffer types
-impl<T> TypedBuffer<T>
-where
-    T: bytemuck::Pod,
-{
+impl<T> TypedBuffer<T> where T: bytemuck::Pod {
     /// Create a vertex buffer
     pub fn vertex(context: &GpuContext, data: &[T]) -> Result<Self> {
         Self::new(context, data, wgpu::BufferUsages::VERTEX)
@@ -152,20 +140,12 @@ where
 
     /// Create a uniform buffer
     pub fn uniform(context: &GpuContext, data: &[T]) -> Result<Self> {
-        Self::new(
-            context,
-            data,
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        )
+        Self::new(context, data, wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST)
     }
 
     /// Create a storage buffer
     pub fn storage(context: &GpuContext, data: &[T]) -> Result<Self> {
-        Self::new(
-            context,
-            data,
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        )
+        Self::new(context, data, wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST)
     }
 }
 
@@ -178,12 +158,14 @@ pub struct StagingBuffer {
 impl StagingBuffer {
     /// Create a new staging buffer
     pub fn new(context: &GpuContext, size: u64) -> Result<Self> {
-        let buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Staging Buffer"),
-            size,
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let buffer = context.device.create_buffer(
+            &(wgpu::BufferDescriptor {
+                label: Some("Staging Buffer"),
+                size,
+                usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        );
 
         Ok(Self { buffer, size })
     }
@@ -193,19 +175,16 @@ impl StagingBuffer {
         &self,
         encoder: &mut wgpu::CommandEncoder,
         source: &wgpu::Buffer,
-        size: Option<u64>,
+        size: Option<u64>
     ) {
         let copy_size = size.unwrap_or(self.size);
         encoder.copy_buffer_to_buffer(source, 0, &self.buffer, 0, copy_size);
     }
 
     /// Map the buffer and read data
-    pub async fn read_data<T>(&self, context: &GpuContext) -> Result<Vec<T>>
-    where
-        T: bytemuck::Pod,
-    {
+    pub async fn read_data<T>(&self, context: &GpuContext) -> Result<Vec<T>> where T: bytemuck::Pod {
         let buffer_slice = self.buffer.slice(..);
-        
+
         // Use a simple future with shared state
         let (sender, receiver) = std::sync::mpsc::channel();
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
@@ -213,16 +192,17 @@ impl StagingBuffer {
         });
 
         context.device.poll(wgpu::Maintain::Wait);
-        
-        receiver.recv().unwrap().map_err(|e| {
-            GeepuError::BufferError(format!("Failed to map buffer: {:?}", e))
-        })?;
+
+        receiver
+            .recv()
+            .unwrap()
+            .map_err(|e| { GeepuError::BufferError(format!("Failed to map buffer: {:?}", e)) })?;
 
         let data = buffer_slice.get_mapped_range();
         let result = bytemuck::cast_slice(&data).to_vec();
         drop(data);
         self.buffer.unmap();
-        
+
         Ok(result)
     }
 

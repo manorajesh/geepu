@@ -1,4 +1,4 @@
-use crate::{GpuContext, ComputePipeline, TypedBuffer};
+use crate::{ GpuContext, ComputePipeline, TypedBuffer };
 
 /// A high-level compute pass wrapper
 pub struct ComputePass<'a> {
@@ -8,10 +8,12 @@ pub struct ComputePass<'a> {
 impl<'a> ComputePass<'a> {
     /// Create a new compute pass
     pub fn new(encoder: &'a mut wgpu::CommandEncoder, label: Option<&str>) -> Self {
-        let pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label,
-            timestamp_writes: None,
-        });
+        let pass = encoder.begin_compute_pass(
+            &(wgpu::ComputePassDescriptor {
+                label,
+                timestamp_writes: None,
+            })
+        );
 
         Self { pass }
     }
@@ -27,14 +29,22 @@ impl<'a> ComputePass<'a> {
     }
 
     /// Dispatch compute workgroups
-    pub fn dispatch_workgroups(&mut self, workgroup_count_x: u32, workgroup_count_y: u32, workgroup_count_z: u32) {
+    pub fn dispatch_workgroups(
+        &mut self,
+        workgroup_count_x: u32,
+        workgroup_count_y: u32,
+        workgroup_count_z: u32
+    ) {
         self.pass.dispatch_workgroups(workgroup_count_x, workgroup_count_y, workgroup_count_z);
     }
 
     /// Dispatch compute workgroups indirectly
-    pub fn dispatch_workgroups_indirect<T>(&mut self, indirect_buffer: &'a TypedBuffer<T>, indirect_offset: u64)
-    where
-        T: bytemuck::Pod,
+    pub fn dispatch_workgroups_indirect<T>(
+        &mut self,
+        indirect_buffer: &'a TypedBuffer<T>,
+        indirect_offset: u64
+    )
+        where T: bytemuck::Pod
     {
         self.pass.dispatch_workgroups_indirect(indirect_buffer.buffer(), indirect_offset);
     }
@@ -48,9 +58,11 @@ pub struct ComputeCommands {
 impl ComputeCommands {
     /// Create new compute commands
     pub fn new(context: &GpuContext, label: Option<&str>) -> Self {
-        let encoder = context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label,
-        });
+        let encoder = context.device.create_command_encoder(
+            &(wgpu::CommandEncoderDescriptor {
+                label,
+            })
+        );
 
         Self { encoder }
     }
@@ -67,14 +79,14 @@ impl ComputeCommands {
         source_offset: u64,
         destination: &wgpu::Buffer,
         destination_offset: u64,
-        copy_size: u64,
+        copy_size: u64
     ) {
         self.encoder.copy_buffer_to_buffer(
             source,
             source_offset,
             destination,
             destination_offset,
-            copy_size,
+            copy_size
         );
     }
 
@@ -83,7 +95,7 @@ impl ComputeCommands {
         &mut self,
         source: wgpu::ImageCopyBuffer,
         destination: wgpu::ImageCopyTexture,
-        copy_size: wgpu::Extent3d,
+        copy_size: wgpu::Extent3d
     ) {
         self.encoder.copy_buffer_to_texture(source, destination, copy_size);
     }
@@ -93,7 +105,7 @@ impl ComputeCommands {
         &mut self,
         source: wgpu::ImageCopyTexture,
         destination: wgpu::ImageCopyBuffer,
-        copy_size: wgpu::Extent3d,
+        copy_size: wgpu::Extent3d
     ) {
         self.encoder.copy_texture_to_buffer(source, destination, copy_size);
     }
@@ -145,7 +157,12 @@ impl WorkgroupSize {
     }
 
     /// Calculate number of workgroups needed for given data size
-    pub fn workgroups_for_size(&self, data_size_x: u32, data_size_y: u32, data_size_z: u32) -> (u32, u32, u32) {
+    pub fn workgroups_for_size(
+        &self,
+        data_size_x: u32,
+        data_size_y: u32,
+        data_size_z: u32
+    ) -> (u32, u32, u32) {
         (
             (data_size_x + self.x - 1) / self.x,
             (data_size_y + self.y - 1) / self.y,
@@ -188,7 +205,7 @@ impl ComputeShaderBuilder {
     /// Generate compute shader with boilerplate
     pub fn build_shader(&self, main_code: &str) -> String {
         let mut shader = String::new();
-        
+
         // Add includes
         for include in &self.includes {
             shader.push_str(include);
@@ -196,10 +213,14 @@ impl ComputeShaderBuilder {
         }
 
         // Add workgroup size
-        shader.push_str(&format!(
-            "@workgroup_size({}, {}, {})\n",
-            self.workgroup_size.x, self.workgroup_size.y, self.workgroup_size.z
-        ));
+        shader.push_str(
+            &format!(
+                "@workgroup_size({}, {}, {})\n",
+                self.workgroup_size.x,
+                self.workgroup_size.y,
+                self.workgroup_size.z
+            )
+        );
 
         // Add local memory if specified
         if let Some(size) = self.local_memory_size {
@@ -224,12 +245,11 @@ impl Default for ComputeShaderBuilder {
 
 /// Common compute patterns
 pub mod patterns {
-
     /// Parallel reduction operation
     pub fn reduction_shader(
         operation: &str, // e.g., "result += data[i];" or "result = max(result, data[i]);"
-        identity: &str,  // e.g., "0.0" or "-3.402823e+38"
-        data_type: &str, // e.g., "f32" or "i32"
+        identity: &str, // e.g., "0.0" or "-3.402823e+38"
+        data_type: &str // e.g., "f32" or "i32"
     ) -> String {
         format!(
             r#"
@@ -273,7 +293,10 @@ fn cs_main(@builtin(global_invocation_id) global_id: vec3<u32>,
     }}
 }}
 "#,
-            data_type, data_type, data_type, identity, 
+            data_type,
+            data_type,
+            data_type,
+            identity,
             operation.replace("result", "shared_data[tid]").replace("data[i]", "shared_data[idx]")
         )
     }
@@ -338,7 +361,11 @@ fn cs_main(@builtin(global_invocation_id) global_id: vec3<u32>,
     }}
 }}
 "#,
-            data_type, data_type, data_type, "0", "0"
+            data_type,
+            data_type,
+            data_type,
+            "0",
+            "0"
         )
     }
 }
