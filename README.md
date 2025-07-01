@@ -1,382 +1,371 @@
 # Geepu - Ergonomic wgpu Wrapper for Rust
 
-Geepu is a zero-cost, ergonomic wrapper around wgpu that simplifies GPU programming in Rust while maintaining performance. It provides high-level abstractions for common GPU operations without sacrificing the power and flexibility of wgpu.
+Geepu is a zero-cost, ergonomic wrapper around wgpu that simplifies GPU programming in Rust while maintaining performance. It provides high-level abstractions for GPU operations without sacrificing the power and flexibility of wgpu.
 
 ## Features
 
-- **Zero-cost abstractions**: All wrapper types compile down to their underlying wgpu equivalents
-- **Type-safe buffers**: `TypedBuffer<T>` provides compile-time type safety for GPU buffers
-- **Ergonomic pipeline creation**: Simplified render and compute pipeline creation with builder patterns
-- **Convenient command recording**: High-level render and compute pass abstractions
-- **Comprehensive texture support**: Easy texture creation and management
-- **Built-in common patterns**: Pre-built compute shader patterns for reductions, prefix sums, etc.
-- **Macro support**: Convenient macros for vertex layouts and bind group layouts
+- **🚀 Easy GPU Initialization**: Simple setup for windowed or offscreen rendering
+- **🔧 Shader Management**: Load and compile WGSL shaders with comprehensive error handling
+- **💾 Resource Management**: Register uniforms, storage buffers, textures, and samplers with type safety
+- **🎨 Render Passes**: High-level abstraction for drawing operations
+- **⚡ Compute Shaders**: Full support for compute pipelines and workgroup dispatch
+- **🔍 Flexible Configuration**: Sensible defaults with advanced wgpu configuration options
+- **📊 Comprehensive Logging**: Built-in tracing support for debugging and profiling
+- **🔒 Memory Safety**: Leverages Rust's type system and bytemuck for safe GPU memory operations
 
 ## Quick Start
 
-Add geepu to your `Cargo.toml`:
+Add Geepu to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-geepu = "0.1.0"
+geepu = "0.2.0"
+anyhow = "1.0"
+bytemuck = { version = "1.23", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros"] }
 ```
 
-### Basic Triangle Example
+### Basic Example
 
 ```rust
-use geepu::*;
+use geepu::{Renderer, WindowConfig, Size};
+use anyhow::Result;
 
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Initialize logging
+    tracing_subscriber::fmt::init();
+
+    // Create windowed renderer
+    let window_config = WindowConfig::new("My App", Size::new(800, 600));
+    let mut renderer = Renderer::new(window_config).await?;
+
+    // Add resources
+    let mvp_matrix = [[1.0f32; 4]; 4]; // Identity matrix
+    renderer.add_uniform("mvp", &mvp_matrix);
+
+    // Load a texture
+    let image = image::open("texture.png")?;
+    renderer.add_texture("diffuse", image)?;
+
+    // Render loop
+    for frame in 0..60 {
+        // Update uniforms
+        renderer.update_uniform("mvp", &updated_matrix)?;
+
+        // Render
+        let mut pass = renderer.begin_pass();
+        pass.draw_indexed(0..indices.len() as u32, 0, 0..1)?;
+        drop(pass);
+        
+        renderer.submit();
+    }
+
+    Ok(())
+}
+```
+
+## API Overview
+
+### Renderer Creation
+
+```rust
+// Windowed rendering
+let renderer = Renderer::new(WindowConfig::default()).await?;
+
+// Offscreen rendering
+let renderer = Renderer::offscreen(Size::new(1920, 1080)).await?;
+
+// With custom GPU configuration
+let gpu_config = GpuConfig::performance()
+    .features(wgpu::Features::COMPUTE_SHADERS)
+    .backends(wgpu::Backends::VULKAN | wgpu::Backends::METAL);
+let renderer = Renderer::new_with_gpu_config(window_config, gpu_config).await?;
+```
+
+### Resource Management
+
+```rust
+// Uniforms (constant data)
 #[repr(C)]
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
+#[derive(bytemuck::Pod, bytemuck::Zeroable)]
+struct MVP {
+    matrix: [[f32; 4]; 4],
 }
 
-async fn render_triangle() -> Result<()> {
-    // Create GPU context (without window for compute-only)
-    let context = GpuContext::new().await?;
+let mvp = MVP { matrix: identity_matrix() };
+renderer.add_uniform("mvp", &mvp);
+renderer.update_uniform("mvp", &updated_mvp)?;
 
-    // Or with a window for rendering
-    // let context = GpuContext::new_with_window(window).await?;
+// Storage buffers (read/write data)
+let data: Vec<f32> = vec![1.0, 2.0, 3.0, 4.0];
+renderer.add_storage_buffer("data", &data);
+renderer.update_storage_buffer("data", &new_data)?;
 
-    // Create vertex data
-    let vertices = [
-        Vertex { position: [0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
-        Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
-        Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] },
-    ];
+// Read back from GPU
+let results = renderer.read_storage_buffer::<f32>("data").await?;
 
-    // Create typed vertex buffer
-    let vertex_buffer = TypedBuffer::vertex(&context, &vertices)?;
-
-    // Define vertex layout with macro
-    let vertex_layout = vertex_layout![
-        0 => VertexFormat::Float32x3, // position
-        1 => VertexFormat::Float32x3, // color
-    ];
-
-    // Create render pipeline
-    let pipeline = RenderPipeline::simple(
-        &context,
-        vertex_shader_source,
-        fragment_shader_source,
-        &[vertex_layout],
-        surface_format,
-        Some("Triangle Pipeline"),
-    )?;
-
-    Ok(())
-}
+// Textures
+let image = image::open("texture.png")?;
+renderer.add_texture("diffuse", image)?;
 ```
 
-### Compute Example
+### Shader Management
 
 ```rust
-use geepu::*;
+// Load shaders from strings
+renderer.shaders.load_vertex_shader(&device, "main_vs", vertex_source)?;
+renderer.shaders.load_fragment_shader(&device, "main_fs", fragment_source)?;
 
-async fn compute_example() -> Result<()> {
-    let context = GpuContext::new().await?;
-
-    // Create input and output buffers
-    let input_data = vec![1.0f32; 1024];
-    let input_buffer = TypedBuffer::storage(&context, &input_data)?;
-    let output_buffer = TypedBuffer::<f32>::empty(&context, 1024,
-        BufferUsages::STORAGE | BufferUsages::COPY_SRC)?;
-
-    // Create bind group layout
-    let bind_group_layout = BindGroupLayoutBuilder::new()
-        .storage_buffer(0, ShaderStages::COMPUTE, true)  // read-only input
-        .storage_buffer(1, ShaderStages::COMPUTE, false) // read-write output
-        .build(&context, Some("Compute Layout"));
-
-    // Create compute pipeline
-    let pipeline = ComputePipeline::new(
-        &context,
-        compute_shader_source,
-        vec![bind_group_layout],
-        Some("Compute Pipeline"),
-    )?;
-
-    Ok(())
-}
-```
-
-## Core Components
-
-### GpuContext
-
-The main entry point that manages the GPU instance, adapter, device, and queue:
-
-```rust
-// For compute-only applications
-let context = GpuContext::new().await?;
-
-// For rendering applications
-let context = GpuContext::new_with_window(window).await?;
-
-// With specific features
-let context = GpuContext::new_with_features(Features::COMPUTE_SHADER).await?;
-```
-
-### TypedBuffer<T>
-
-Type-safe buffer wrapper that prevents common GPU programming errors:
-
-```rust
-// Create different buffer types
-let vertex_buffer = TypedBuffer::vertex(&context, &vertex_data)?;
-let index_buffer = TypedBuffer::index(&context, &index_data)?;
-let uniform_buffer = TypedBuffer::uniform(&context, &uniform_data)?;
-let storage_buffer = TypedBuffer::storage(&context, &storage_data)?;
-
-// Write data to buffers
-uniform_buffer.write(&context, &new_uniform_data)?;
-```
-
-### Texture
-
-Simplified texture creation and management:
-
-```rust
-// Create texture from raw data
-let texture = Texture::from_bytes(&context, image_bytes, width, height, format, None)?;
-
-// Create render target
-let render_target = Texture::create_render_target(&context, width, height, format, None)?;
-
-// Create depth texture
-let depth_texture = Texture::create_depth_texture(&context, width, height, None)?;
-
-// Using the builder pattern
-let texture = TextureBuilder::new(1024, 1024)
-    .format(TextureFormat::Rgba8UnormSrgb)
-    .usage(TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING)
-    .label("My Texture")
-    .build(&context)?;
-```
-
-### Pipeline Creation
-
-Simplified pipeline creation with sensible defaults:
-
-```rust
-// Simple render pipeline
-let pipeline = RenderPipeline::simple(
-    &context,
-    vertex_shader,
-    fragment_shader,
-    &vertex_layouts,
-    surface_format,
-    Some("My Pipeline"),
+// Load from files
+renderer.shaders.load_shader_from_file(
+    &device, 
+    "my_shader", 
+    "shaders/compute.wgsl", 
+    ShaderType::Compute
 )?;
 
-// Compute pipeline
-let pipeline = ComputePipeline::new(
-    &context,
-    compute_shader,
-    bind_group_layouts,
-    Some("Compute Pipeline"),
-)?;
+// Add compute shaders
+renderer.add_compute_shader("multiply", compute_source)?;
 ```
 
-### Render and Compute Commands
-
-High-level command recording:
+### Compute Shaders
 
 ```rust
-// Render commands
-let mut commands = RenderCommands::new(&context, Some("Frame"));
-let mut render_pass = commands.begin_render_pass(&color_attachments, None, Some("Main Pass"));
-render_pass.set_pipeline(&pipeline);
-render_pass.set_vertex_buffer(0, &vertex_buffer);
-render_pass.draw(0..vertex_count, 0..1);
-drop(render_pass);
-commands.submit(&context);
+// Load compute shader
+let compute_source = r#"
+@group(0) @binding(0)
+var<storage, read_write> data: array<f32>;
 
-// Compute commands
-let mut commands = ComputeCommands::new(&context, Some("Compute"));
-let mut compute_pass = commands.begin_compute_pass(Some("Process Data"));
-compute_pass.set_pipeline(&pipeline);
-compute_pass.set_bind_group(0, &bind_group, &[]);
-compute_pass.dispatch_workgroups(workgroup_count_x, workgroup_count_y, workgroup_count_z);
-drop(compute_pass);
-commands.submit(&context);
+@compute @workgroup_size(64)
+fn cs_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let index = global_id.x;
+    if (index >= arrayLength(&data)) { return; }
+    data[index] = data[index] * 2.0;
+}
+"#;
+
+renderer.add_compute_shader("multiply", compute_source)?;
+
+// Dispatch computation
+let workgroups = (data.len() + 63) / 64;
+renderer.dispatch_compute("multiply", workgroups, 1, 1)?;
+renderer.submit();
 ```
 
-## Macros
-
-Geepu provides convenient macros for common operations:
-
-### Vertex Layout Macro
+### Render Passes
 
 ```rust
-let layout = vertex_layout![
-    0 => VertexFormat::Float32x3, // position
-    1 => VertexFormat::Float32x3, // normal
-    2 => VertexFormat::Float32x2, // tex_coords
-];
+// Begin a render pass
+let mut pass = renderer.begin_pass();
+
+// In a complete implementation, you would:
+// - Create render pipelines
+// - Set bind groups for resources
+// - Set vertex/index buffers
+// - Issue draw calls
+
+pass.draw_indexed(indices_range, base_vertex, instances_range)?;
+drop(pass);
+
+// Submit all commands
+renderer.submit();
 ```
 
-### Bind Group Layout Macro
+### Offscreen Rendering
 
 ```rust
-let layout = bind_group_layout!(&context, Some("My Layout"), {
-    0 => BindingType::UniformBuffer(ShaderStages::VERTEX),
-    1 => BindingType::Texture {
-        visibility: ShaderStages::FRAGMENT,
-        sample_type: TextureSampleType::Float { filterable: true },
-        view_dimension: TextureViewDimension::D2,
-        multisampled: false
-    },
-    2 => BindingType::Sampler {
-        visibility: ShaderStages::FRAGMENT,
-        sampler_type: SamplerBindingType::Filtering
-    },
-});
+// Create offscreen renderer
+let mut renderer = Renderer::offscreen(Size::new(1024, 1024)).await?;
+
+// Render scene
+{
+    let mut pass = renderer.begin_pass();
+    // ... render operations ...
+    drop(pass);
+    renderer.submit();
+}
+
+// Copy result to CPU
+let image_data = renderer.copy_to_buffer().await?;
+
+// Save to file
+let image = image::RgbaImage::from_raw(1024, 1024, image_data).unwrap();
+image.save("output.png")?;
 ```
 
-## Compute Shader Patterns
+## Advanced Configuration
 
-Geepu includes pre-built compute shader patterns for common operations:
+### GPU Configuration
 
 ```rust
-use geepu::compute::patterns;
-
-// Parallel reduction
-let reduction_shader = patterns::reduction_shader(
-    "result += data[i];", // operation
-    "0.0",               // identity value
-    "f32"                // data type
-);
-
-// Prefix sum (scan)
-let scan_shader = patterns::prefix_sum_shader("f32");
+let gpu_config = GpuConfig::default()
+    .backends(wgpu::Backends::VULKAN | wgpu::Backends::METAL)
+    .features(wgpu::Features::COMPUTE_SHADERS | wgpu::Features::TEXTURE_BINDING_ARRAY)
+    .limits(wgpu::Limits {
+        max_compute_workgroup_size_x: 1024,
+        max_compute_workgroup_size_y: 1024,
+        max_compute_workgroup_size_z: 64,
+        ..Default::default()
+    })
+    .force_fallback_adapter(false);
 ```
+
+### Window Configuration
+
+```rust
+let window_config = WindowConfig::new("My Application", Size::new(1280, 720))
+    .resizable(true)
+    .vsync(false);
+```
+
+### Logging Configuration
+
+```rust
+use tracing_subscriber::fmt;
+use tracing::Level;
+
+// Basic logging
+tracing_subscriber::fmt::init();
+
+// Detailed logging with custom format
+fmt()
+    .with_max_level(Level::DEBUG)
+    .with_target(false)
+    .with_thread_ids(true)
+    .with_file(true)
+    .with_line_number(true)
+    .init();
+```
+
+## Shader Examples
+
+### Vertex Shader (WGSL)
+
+```wgsl
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+    @location(1) tex_coords: vec2<f32>,
+}
+
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) tex_coords: vec2<f32>,
+}
+
+@group(0) @binding(0)
+var<uniform> mvp_matrix: mat4x4<f32>;
+
+@vertex
+fn vs_main(model: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.tex_coords = model.tex_coords;
+    out.clip_position = mvp_matrix * vec4<f32>(model.position, 1.0);
+    return out;
+}
+```
+
+### Fragment Shader (WGSL)
+
+```wgsl
+@group(1) @binding(0)
+var t_diffuse: texture_2d<f32>;
+@group(1) @binding(1)
+var s_diffuse: sampler;
+
+@fragment
+fn fs_main(@location(0) tex_coords: vec2<f32>) -> @location(0) vec4<f32> {
+    return textureSample(t_diffuse, s_diffuse, tex_coords);
+}
+```
+
+### Compute Shader (WGSL)
+
+```wgsl
+@group(0) @binding(0)
+var<storage, read_write> data: array<f32>;
+
+@group(0) @binding(1)
+var<uniform> params: ComputeParams;
+
+struct ComputeParams {
+    multiplier: f32,
+    offset: f32,
+}
+
+@compute @workgroup_size(64)
+fn cs_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let index = global_id.x;
+    if (index >= arrayLength(&data)) {
+        return;
+    }
+    
+    data[index] = data[index] * params.multiplier + params.offset;
+}
+```
+
+## Performance Tips
+
+1. **Batch Operations**: Group multiple draw calls or compute dispatches together
+2. **Resource Reuse**: Reuse buffers and textures when possible
+3. **Optimal Workgroup Sizes**: Use workgroup sizes that are multiples of the GPU's warp/wavefront size
+4. **Memory Layout**: Use `#[repr(C)]` and `bytemuck` for predictable memory layouts
+5. **Pipeline Caching**: Reuse render and compute pipelines across frames
 
 ## Error Handling
 
-Geepu uses a comprehensive error type that covers common GPU programming issues:
+Geepu provides comprehensive error handling through the `GeepuError` type:
 
 ```rust
-use geepu::{Result, GeepuError};
+use geepu::{GeepuError, Result};
 
-fn gpu_operation() -> Result<()> {
-    match some_gpu_operation() {
-        Ok(result) => Ok(result),
-        Err(GeepuError::AdapterNotFound) => {
-            eprintln!("No suitable GPU found");
-            Err(GeepuError::AdapterNotFound)
-        }
-        Err(e) => {
-            eprintln!("GPU error: {}", e);
-            Err(e)
-        }
-    }
+match renderer.add_texture("missing", image) {
+    Ok(_) => println!("Texture added successfully"),
+    Err(GeepuError::Image(e)) => println!("Image error: {}", e),
+    Err(GeepuError::ResourceNotFound(name)) => println!("Resource {} not found", name),
+    Err(e) => println!("Other error: {}", e),
 }
 ```
 
 ## Examples
 
-The repository includes several examples:
-
-- `triangle.rs` - Basic triangle rendering
-- `compute_simple.rs` - Simple compute shader example
-- `texture_rendering.rs` - Texture loading and rendering
-- `instanced_rendering.rs` - Instanced rendering example
-- `compute_reduction.rs` - Parallel reduction compute example
-
-Run examples with:
+Run the included examples:
 
 ```bash
-cargo run --example triangle
-cargo run --example compute_simple
+# Basic hello triangle example
+cargo run --example hello_triangle
+
+# Compute shader example
+cargo run --example compute
+
+# Offscreen rendering example
+cargo run --example offscreen
+
+# Comprehensive example (included in main.rs)
+cargo run
 ```
 
-## Performance
+## Architecture
 
-Geepu is designed to be zero-cost - all abstractions compile down to direct wgpu calls with no runtime overhead. The wrapper types are thin and the builder patterns are compile-time constructs.
+Geepu is built on top of wgpu and provides:
+
+- **Zero-cost abstractions**: No runtime overhead compared to raw wgpu
+- **Type safety**: Leverages Rust's type system to prevent common GPU programming errors
+- **Resource management**: Automatic cleanup and efficient resource tracking
+- **Extensibility**: Easy to extend with custom pipelines and operations
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Simplified API
+## Acknowledgments
 
-Geepu now provides high-level helper functions that eliminate most boilerplate, letting you create render and compute pipelines with a single call.
-
-### Easy Render Pipeline
-
-Define your uniform data as a Rust struct:
-
-```rust
-#[repr(C)]
-#[derive(Copy, Clone, Pod, Zeroable)]
-struct Uniforms {
-    model: [[f32; 4]; 4],
-    view:  [[f32; 4]; 4],
-    proj:  [[f32; 4]; 4],
-}
-```
-
-Then build and use a pipeline in one step:
-
-```rust
-let uniforms = Uniforms { /* init matrices */ };
-
-let simple_pipeline = context
-    .create_simple_pipeline(
-        vertex_shader_source,
-        fragment_shader_source,
-        &[vertex_layout],         // your vertex layouts
-        &uniforms,                // your uniform struct
-        &[&texture],              // optional textures
-        Some("EasyPipeline"),    // optional label
-    )?;
-
-// Render pass usage:
-let mut commands = RenderCommands::new(&context, Some("Frame"));
-let mut pass = commands.begin_render_pass(
-    &[Some(color_attachment(&view, None))],
-    None,
-    Some("MainPass"),
-);
-pass.set_pipeline(&simple_pipeline.pipeline);
-pass.set_vertex_buffer(0, &vertex_buffer);
-pass.draw(0..3, 0..1);
-drop(pass);
-commands.submit(&context);
-```
-
-### Easy Compute Pipeline
-
-Similarly, for compute workloads:
-
-```rust
-#[repr(C)]
-#[derive(Copy, Clone, Pod, Zeroable)]
-struct Params { value: f32; }
-
-let params = Params { value: 1.0 };
-let storage_buffers = vec![&buffer_a, &buffer_b];
-
-let compute_pipeline = context
-    .create_simple_compute(
-        compute_shader_source,
-        &params,                  // uniform struct
-        &storage_buffers,         // list of storage buffers
-        Some("EasyCompute"),     // optional label
-    )?;
-
-let mut compute_cmds = ComputeCommands::new(&context, Some("Compute"));
-let mut cpass = compute_cmds.begin_compute_pass(Some("CSMain"));
-cpass.set_pipeline(&compute_pipeline.pipeline);
-cpass.set_bind_group(0, &compute_pipeline.bind_group, &[]);
-cpass.dispatch_workgroups(64, 1, 1);
-drop(cpass);
-compute_cmds.submit(&context);
-```
+- Built on the excellent [wgpu](https://github.com/gfx-rs/wgpu) project
+- Inspired by modern graphics API best practices
+- Thanks to the Rust graphics community for feedback and contributions

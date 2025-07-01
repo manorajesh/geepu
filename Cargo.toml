@@ -1,39 +1,23 @@
 [package]
 name = "geepu"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "An ergonomic, zero-cost wrapper around wgpu for simplified GPU programming in Rust"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/username/geepu"
-homepage = "https://github.com/username/geepu"
+license = "MIT"
+repository = "https://github.com/manorajesh/geepu"
+homepage = "https://github.com/manorajesh/geepu"
 documentation = "https://docs.rs/geepu"
 keywords = ["gpu", "wgpu", "graphics", "compute", "rendering"]
 categories = ["graphics", "science", "mathematics"]
 readme = "README.md"
 
-[[bin]]
-name = "geepu"
-path = "src/main.rs"
-
 [dependencies]
-wgpu = "22.0"
-winit = "0.30"
-pollster = "0.3"
-bytemuck = { version = "1.18", features = ["derive"] }
-anyhow = "1.0"
-env_logger = "0.11"
-
-[dev-dependencies]
-# Add development dependencies for examples and tests
-
-[[example]]
-name = "compute_simple"
-path = "examples/compute_simple.rs"
-
-[[example]]
-name = "texture_example"
-path = "examples/texture_example.rs"
-
-[[example]]
-name = "macro_example"
-path = "examples/macro_example.rs"
+anyhow = "1.0.98"
+bytemuck = { version = "1.23.1", features = ["derive"] }
+image = "0.25.6"
+pollster = "0.4.0"
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros"] }
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+wgpu = "25.0.2"
+winit = "0.30.8"
